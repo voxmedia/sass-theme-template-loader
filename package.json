@@ -1,7 +1,7 @@
 {
-  "name": "theme-template-loader",
+  "name": "sass-theme-template-loader",
   "version": "0.0.1",
-  "description": "Sass themed CSS template loader for Webpack",
+  "description": "Sass to themed CSS-template loader for Webpack",
   "main": "index.js",
   "loader": "loader.js",
   "scripts": {
@@ -9,14 +9,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gmac/theme-template-loader.git"
+    "url": "git+https://github.com/gmac/sass-theme-template-loader.git"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/gmac/theme-template-loader/issues"
+    "url": "https://github.com/gmac/sass-theme-template-loader/issues"
   },
-  "homepage": "https://github.com/gmac/theme-template-loader#readme",
+  "homepage": "https://github.com/gmac/sass-theme-template-loader",
   "dependencies": {
     "async": "^1.4.2",
     "cssmin": "^0.4.3",

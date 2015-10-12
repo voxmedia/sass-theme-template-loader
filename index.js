@@ -1,4 +1,5 @@
 var fs = require('fs');
+var os = require('os');
 var path = require('path');
 var Thematic = require('sass-thematic/lib/thematic');
 
@@ -23,8 +24,7 @@ function ThemeTemplatePlugin(opts) {
   }, this);
 
   this.renderer = new Thematic({}, opts);
-  this.templateCache = {};
-  this.importCache = {};
+  this.resourceCache = {};
   this.warnings = [];
 }
 
@@ -50,7 +50,7 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
         try {
           fs.writeFileSync(templatePath, templateSource);
         } catch(err) {
-          self.addWarning(err, templatePath, 'template could not be written');
+          self.addWarning(err, templatePath, 'Template could not be written');
         }
       }
 
@@ -72,12 +72,13 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
     }
 
     // Report all warnings:
-    this.warnings.forEach(function(warning) {
+    self.warnings.forEach(function(warning) {
       compilation.warnings.push(warning);
     });
 
     // Reset plugin state:
-    this.warnings = [];
+    this.resourceCache = {};
+    self.warnings = [];
     callback();
   });
 };
@@ -125,10 +126,14 @@ ThemeTemplatePlugin.prototype.resolve = function(uri, prevUri, done) {
 
   function lookup(index) {
     var filepath = paths[index];
+    var cached = self.resourceCache[filepath];
 
-    if (!filepath) return setImmediate(function() {
-      done(self.pathLookupError(paths, uri, prevUri));
-    });
+    if (cached || !filepath) {
+      return setImmediate(function() {
+        if (cached) return done(null, cached);
+        done(self.pathLookupError(paths, uri, prevUri));
+      });
+    }
 
     fs.readFile(filepath, 'utf-8', function(err, data) {
       if (err && err.code === 'ENOENT') return lookup(index+1);
@@ -152,6 +157,9 @@ ThemeTemplatePlugin.prototype.resolveSync = function(uri, prevUri) {
 
   for (var i=0; i < paths.length; i++) {
     var filepath = paths[i];
+    var cached = this.resourceCache[filepath];
+
+    if (cached) return cached;
 
     try {
       var data = fs.readFileSync(filepath, 'utf-8');
@@ -182,9 +190,10 @@ ThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
       .toString();
   } catch (err) {
     resource.contents = this.renderer.varsToFieldLiterals(data);
-    this.addWarning(err, filepath, 'failed to parse syntax tree, using regex fallback.');
+    this.addWarning(err, filepath, 'Failed to parse syntax tree, using regex fallback');
   }
 
+  this.resourceCache[filepath] = resource;
   return resource;
 };
 
@@ -204,10 +213,8 @@ ThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) 
     err.file = fileContext;
   }
 
+  var excerpt = null;
   if (/\.s?css/.test(err.file)) {
-    var os = require('os');
-    var excerpt = null;
-
     try {
       excerpt = fs.readFileSync(err.file, 'utf8');
       excerpt = os.EOL + excerpt.split(os.EOL)[err.line-1] +
@@ -217,13 +224,13 @@ ThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) 
     }
   }
 
-  var errorMessage = ['ThemeTemplatePlugin'];
-  errorMessage.push('-> '+ (message || 'Error encountered in') +': '+ fileContext);
+  var errorMessage = ['Sass Theme Template'];
+  errorMessage.push('-> '+ (message || 'Error encountered in') +':\n'+ fileContext);
   if (err.message) errorMessage.push('-> '+ err.message);
   if (excerpt)  errorMessage.push(excerpt);
 
   // Throw new error:
-  var error = new Error(errorMessage.join('\n'));
+  var error = new Error(errorMessage.join(os.EOL));
   error.line = err.line || null;
   error.column = err.column || null;
   error.hideStack = true;
@@ -231,10 +238,21 @@ ThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) 
 };
 
 /**
-* Formats a path lookup error.
+* Formats a non-breaking warning message.
 */
 ThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, message) {
-  this.warnings.push(err.message);
+  var warningMessage = ['Sass Theme Template'];
+  var preview = null;
+
+  if (typeof err.css_ === 'string' && err.line) {
+    preview = '>>>>> '+ err.css_.split(os.EOL)[err.line-1];
+  }
+
+  warningMessage.push('-> '+ (message || 'Problem encountered in') +' in:\n'+ fileContext);
+  warningMessage.push('-> '+ err.message);
+  if (preview) warningMessage.push(preview);
+
+  this.warnings.push(warningMessage.join(os.EOL));
 };
 
 module.exports = ThemeTemplatePlugin;

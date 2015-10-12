@@ -23,18 +23,11 @@ module.exports = function(content, plugin) {
   }
 
   this.cacheable();
+
+  var self = this;
   var callback = this.async();
   var isSync = typeof callback !== 'function';
   var resource = plugin.parseResource(this.resourcePath, content);
-  
-  // Validate the integrity of the loaded resource:
-  // report any errors with the resource before proceeding.
-  if (resource.error) {
-    if (isSync) throw resource.error;
-    return callback(resource.error);
-  }
-
-  var self = this;
   var opts = {
     file: resource.file,
     data: resource.contents,
@@ -62,24 +55,25 @@ module.exports = function(content, plugin) {
     self.dependency(path.normalize(filepath));
   }
 
-  opts.importer = function(url, fileContext, done) {
-    // Convert "stdin" reference to a real file path:
-    if (fileContext === 'stdin') {
-      fileContext = path.dirname(opts.file);
-    }
+  function importerContext(filepath) {
+    return filepath === 'stdin' ? path.dirname(opts.file) : filepath;
+  }
 
-    if (isSync) {
-      var res = plugin.resolveSync(url, fileContext);
-      addDependency(res.file);
-      return res.error ? res.error : res;
-    }
+  function importerSync(url, fileContext) {
+    var res = plugin.resolveSync(url, importerContext(fileContext));
+    addDependency(res.file);
+    return res;
+  }
 
-    plugin.resolve(url, fileContext, function(err, res) {
+  function importerAsync(url, fileContext, done) {
+    plugin.resolve(url, importerContext(fileContext), function(err, res) {
       if (err) return done(err);
       addDependency(res.file);
-      done(res.error ? res.error : res);
+      done(res);
     });
-  };
+  }
+
+  opts.importer = isSync ? importerSync : importerAsync;
 
   // Render Sync:
   if (isSync) {

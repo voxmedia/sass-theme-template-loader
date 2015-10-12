@@ -25,6 +25,7 @@ function ThemeTemplatePlugin(opts) {
   this.renderer = new Thematic({}, opts);
   this.templateCache = {};
   this.importCache = {};
+  this.warnings = [];
 }
 
 /**
@@ -42,9 +43,15 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
 
       if (self.writePath) {
         var cssmin = require('cssmin');
-        var template = self.renderer.fieldLiteralsToInterpolations(cssmin(source));
-        var templateFile = this.filename.replace('[name]', filename.match(cssFile)[1]);
-        fs.writeFileSync(path.resolve(self.writePath, templateFile), template);
+        var templateSource = self.renderer.fieldLiteralsToInterpolations(source);
+        var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
+        var templatePath = path.resolve(self.writePath, templateName);
+
+        try {
+          fs.writeFileSync(templatePath, templateSource);
+        } catch(err) {
+          self.addWarning(err, templatePath, 'template could not be written');
+        }
       }
 
       source = self.renderer.fieldLiteralsToValues(source);
@@ -57,12 +64,20 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
       };
     }
 
+    // Render all CSS assets:
     for (var filename in compilation.assets) {
       if (cssFile.test(filename)) {
         renderAsset(filename);
       }
     }
 
+    // Report all warnings:
+    this.warnings.forEach(function(warning) {
+      compilation.warnings.push(warning);
+    });
+
+    // Reset plugin state:
+    this.warnings = [];
     callback();
   });
 };
@@ -166,9 +181,8 @@ ThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
       .parse({template: true, disableTreeRemoval: true})
       .toString();
   } catch (err) {
-    // TODO: possibly make this a warning with Regex vars replacement,
-    // rather than throwing an error?
-    resource.error = err;
+    resource.contents = this.renderer.varsToFieldLiterals(data);
+    this.addWarning(err, filepath, 'failed to parse syntax tree, using regex fallback.');
   }
 
   return resource;
@@ -186,27 +200,41 @@ ThemeTemplatePlugin.prototype.pathLookupError = function(paths, uri, prevUri) {
 * Formats a general error.
 */
 ThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) {
-  // Use most specific file context available:
-  fileContext = path.normalize((err.file && err.file !== 'stdin') ? err.file : fileContext);
-  var excerpt = '';
-  var os = require('os');
+  if (!err.file || err.file === 'stdin') {
+    err.file = fileContext;
+  }
 
-  if (fileContext) {
+  if (/\.s?css/.test(err.file)) {
+    var os = require('os');
+    var excerpt = null;
+
     try {
-      excerpt = fs.readFileSync(fileContext, 'utf8');
-      excerpt = os.EOL + excerpt.split(os.EOL)[err.line-1] + 
+      excerpt = fs.readFileSync(err.file, 'utf8');
+      excerpt = os.EOL + excerpt.split(os.EOL)[err.line-1] +
                 os.EOL + new Array(err.column-1).join(' ') + '^';
     } catch (err) {
-      excerpt = '';
+      excerpt = null;
     }
   }
 
+  var errorMessage = ['ThemeTemplatePlugin'];
+  errorMessage.push('-> '+ (message || 'Error encountered in') +': '+ fileContext);
+  if (err.message) errorMessage.push('-> '+ err.message);
+  if (excerpt)  errorMessage.push(excerpt);
+
   // Throw new error:
-  var error = new Error('ThemeTemplatePlugin\n-> '+ (message || '') +'\n-> '+ err.message);
+  var error = new Error(errorMessage.join('\n'));
   error.line = err.line || null;
   error.column = err.column || null;
   error.hideStack = true;
   return error;
+};
+
+/**
+* Formats a path lookup error.
+*/
+ThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, message) {
+  this.warnings.push(err.message);
 };
 
 module.exports = ThemeTemplatePlugin;

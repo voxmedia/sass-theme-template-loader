@@ -1,12 +1,13 @@
 # Sass theme template loader for Webpack
 
-When creating themed CSS to share across numerous sites, a common strategy is to pass site-specific theme variables through to a pre-rendered CSS template. This Webpack loader provides a system for passing raw Sass variable fields through to a rendered CSS template using [SassThematic](https://github.com/gmac/sass-thematic) as a foundation.
+When creating themed websites, a common strategy is to generate pre-rendered CSS templates with theme values interpolated into them. This Webpack loader provides a system for passing raw Sass variable fields through to a rendered CSS template using the [SassThematic](https://github.com/gmac/sass-thematic) workflow.
 
-This loader expects that you're already using the `extract-text-webpack-plugin` to pull your CSS assets out into separate files. This loader handles rendering Sass with embedded template fields, and then generates a template version of each extracted CSS asset.
+This loader expects that you're already using the `extract-text-webpack-plugin` to pull your CSS assets out into separate files. This loader will render Sass markup with embedded template fields, and then generate a template version of all extracted CSS assets.
 
 ## Example
 
-**In `_theme.scss`:**
+**In `_theme.scss`:**  
+_This file identifies the names of relevant theme variables._
 
 ```scss
 $color-theme: green;
@@ -51,6 +52,8 @@ npm install --save sass-theme-template-loader
 
 ## Configure
 
+The `sass-theme-template` loader handles primary Sass rendering. Use this loader _instead of_ other Sass loaders.
+
 ```javascript
 var ExtractText = require('extract-text-webpack-plugin');
 var SassThemeTemplate = require('sass-theme-template-loader');
@@ -81,10 +84,21 @@ var config = {
 };
 ```
 
+**Setup:**
+
+The `SassThemeTemplate` plugin piggy-backs off of the `ExtractText` plugin. Like `extract-text-webpack-plugin`, this build tool also uses a loader and a plugin in tandem. 
+
+1. Install the `sass-theme-template` loader as the first (right-most) Sass loader. This should _replace_ all other Sass loaders. 
+1. Install the `SassThemeTemplate` after the `ExtractText` plugin. Configuration options are the same as [SassThematic](https://github.com/gmac/sass-thematic).
+
 **How it works:**
 
-SassThemeTemplate piggy-backs off of the ExtractText plugin for Webpack. First, the `sass-theme-template` loader is installed as the first Sass loader (_replacing_ all other Sass loader modules). The `sass-theme-template` loader will handle rendering your Sass with theme-specific variable names stubbed out as template fields. Note that template fields may _not_ be used in pre-rendered Sass transformations (ie: math expressions, interpolations, etc), so the loader also validates your useage of Sass theme variables to discover pre-render implementations of post-render data fields.
+The `sass-theme-template` loader will render your Sass markup with theme-specific variable names stubbed out as template fields. In addition, it will validate your usage of Sass theme variables to assure these post-rendered values are not used in pre-rendered contexts. The following pre-rendered implementations are not allowed:
 
-After Sass has been rendered by the loader with template fields passed through, you're welcome to pass your CSS along to any number of susequent CSS loaders (ie: autoprefixer, etc). `ExtractText` should be configured to pull your final CSS files out of your JavaScript build.
+- Theme variables as arguments are NOT allowed: `color: tint($theme-fail, 10%);`
+- Theme variables in operations are NOT allowed: `top: $theme-fail + 5;`
+- Theme variables in interpolations are NOT allowed: `margin: #{$theme-fail}px;`
 
-Finally, the `SassThemeTemplate` plugin finds all extracted CSS assets, and does a final pass at rendering theme values into those extracted assets, and creates an alternate version of each asset with template interpolations.
+After Sass has been rendered with template fields passed through, you're welcome to pass your CSS along to any number of susequent CSS loaders (ie: autoprefixer, etc). `ExtractText` should be configured to pull your final CSS assets out of your JavaScript build.
+
+Finally, the `SassThemeTemplate` plugin finds all extracted CSS assets, and does a final pass to fill in theme values for the extracted assets, and creates an alternate version of each asset with template interpolations.

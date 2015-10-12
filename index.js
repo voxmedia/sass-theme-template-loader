@@ -42,7 +42,6 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
       var source = asset.source();
 
       if (self.writePath) {
-        var cssmin = require('cssmin');
         var templateSource = self.renderer.fieldLiteralsToInterpolations(source);
         var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
         var templatePath = path.resolve(self.writePath, templateName);

@@ -1,6 +1,6 @@
 {
   "name": "sass-theme-template-loader",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Sass to themed CSS-template loader for Webpack",
   "main": "index.js",
   "loader": "loader.js",
@@ -19,8 +19,9 @@
   "homepage": "https://github.com/gmac/sass-theme-template-loader",
   "dependencies": {
     "async": "^1.4.2",
-    "cssmin": "^0.4.3",
-    "node-sass": "^3.3.3",
     "sass-thematic": "^1.2.1"
+  },
+  "peerDependencies": {
+    "node-sass": "^3.3.0"
   }
 }

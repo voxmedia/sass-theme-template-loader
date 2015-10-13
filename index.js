@@ -8,11 +8,11 @@ var Thematic = require('sass-thematic/lib/thematic');
 * Hooks template file output into the loader pipe.
 * This plugin must be used as part of the template loader pipe.
 */
-function ThemeTemplatePlugin(opts) {
-  if (ThemeTemplatePlugin.plugin)
-    throw 'ThemeTemplatePlugin was already instantiated.';
+function SassThemeTemplatePlugin(opts) {
+  if (SassThemeTemplatePlugin.plugin)
+    throw 'SassThemeTemplatePlugin was already instantiated.';
 
-  ThemeTemplatePlugin.plugin = this;
+  SassThemeTemplatePlugin.plugin = this;
   opts = opts || {};
 
   this.cwd = opts.cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
@@ -31,19 +31,45 @@ function ThemeTemplatePlugin(opts) {
 /**
 * Applies the plugin to the Webpack compiler.
 */
-ThemeTemplatePlugin.prototype.apply = function(compiler) {
+SassThemeTemplatePlugin.prototype.apply = function(compiler) {
   var self = this;
   var cssFile = /(.+)\.css$/;
 
-  compiler.plugin('emit', function(compilation, callback) {
+  // Pre-build step used to invalidate caches:
+  compiler.plugin('compilation', function(compilation) {
+    var changed = compilation.fileTimestamps;
 
+    // Invalidate cached files:
+    for (var filename in changed) {
+      var cached = self.resourceCache[filename];
+      if (cached && cached.timestamp < changed[filename]) {
+        delete self.resourceCache[filename];
+      }
+    }
+  });
+
+  // Pre-emit step used for a final pass on all published assets:
+  compiler.plugin('emit', function(compilation, callback) {
     function renderAsset(filename) {
       var asset = compilation.assets[filename];
       var source = asset.source();
+      var templateSource = self.renderer.fieldLiteralsToInterpolations(source);
+      var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
 
+      // Add processed template asset to the build:
+      compilation.assets[templateName] = {
+        source: function() {
+          return templateSource;
+        },
+        size: function() {
+          return templateSource.length;
+        }
+      };
+
+      // Attempt to write the processed template asset:
+      // We're doing this in addition to adding the compiled asset,
+      // so that we can see the live rendered template view within an app.
       if (self.writePath) {
-        var templateSource = self.renderer.fieldLiteralsToInterpolations(source);
-        var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
         var templatePath = path.resolve(self.writePath, templateName);
 
         try {
@@ -53,8 +79,10 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
         }
       }
 
+      // Process flat CSS asset:
       source = self.renderer.fieldLiteralsToValues(source);
 
+      // Update CSS asset within the build:
       asset.source = function() {
         return source;
       };
@@ -76,7 +104,6 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
     });
 
     // Reset plugin state:
-    this.resourceCache = {};
     self.warnings = [];
     callback();
   });
@@ -88,7 +115,7 @@ ThemeTemplatePlugin.prototype.apply = function(compiler) {
 * @param {String} context uri of the previously imported file.
 * @returns {Array} array of lookup paths.
 */
-ThemeTemplatePlugin.prototype.lookupPaths = function(uri, prevUri) {
+SassThemeTemplatePlugin.prototype.lookupPaths = function(uri, prevUri) {
   var prev = path.parse(prevUri);
   var file = path.parse(uri);
   file.name = file.name.replace(/^_/, '');
@@ -119,7 +146,7 @@ ThemeTemplatePlugin.prototype.lookupPaths = function(uri, prevUri) {
 * @param {Function} callback to fire on completion.
 * @callback {file: String, error: Error} || {file: String, contents: String}
 */
-ThemeTemplatePlugin.prototype.resolve = function(uri, prevUri, done) {
+SassThemeTemplatePlugin.prototype.resolve = function(uri, prevUri, done) {
   var self = this;
   var paths = this.lookupPaths(uri, prevUri);
 
@@ -150,7 +177,7 @@ ThemeTemplatePlugin.prototype.resolve = function(uri, prevUri, done) {
 * @param {String} context uri of the previously imported file.
 * @returns {file: String, error: Error} || {file: String, contents: String}
 */
-ThemeTemplatePlugin.prototype.resolveSync = function(uri, prevUri) {
+SassThemeTemplatePlugin.prototype.resolveSync = function(uri, prevUri) {
   var paths = this.lookupPaths(uri, prevUri);
   var result = {};
 
@@ -180,7 +207,7 @@ ThemeTemplatePlugin.prototype.resolveSync = function(uri, prevUri) {
 * @param {String} data of the loaded resource file contents.
 * @returns {file: String, error: Error} || {file: String, contents: String}
 */
-ThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
+SassThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
   var resource = {file: filepath};
 
   try {
@@ -191,7 +218,8 @@ ThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
     resource.contents = this.renderer.varsToFieldLiterals(data);
     this.addWarning(err, filepath, 'Failed to parse syntax tree, using regex fallback');
   }
-
+  
+  resource.timestamp = Date.now();
   this.resourceCache[filepath] = resource;
   return resource;
 };
@@ -199,7 +227,7 @@ ThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
 /**
 * Formats a path lookup error.
 */
-ThemeTemplatePlugin.prototype.pathLookupError = function(paths, uri, prevUri) {
+SassThemeTemplatePlugin.prototype.pathLookupError = function(paths, uri, prevUri) {
   return new Error('Import error in:\n'+ prevUri +'\nThe import "'+ uri +'" could not be resolved. Searched paths:\n'
     + paths.map(function(p) { return ' - ' + p }).join('\n'));
 };
@@ -207,7 +235,7 @@ ThemeTemplatePlugin.prototype.pathLookupError = function(paths, uri, prevUri) {
 /**
 * Formats a general error.
 */
-ThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) {
+SassThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) {
   if (!err.file || err.file === 'stdin') {
     err.file = fileContext;
   }
@@ -239,7 +267,7 @@ ThemeTemplatePlugin.prototype.formatError = function(err, fileContext, message) 
 /**
 * Formats a non-breaking warning message.
 */
-ThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, message) {
+SassThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, message) {
   var warningMessage = ['Sass Theme Template'];
   var preview = null;
 
@@ -254,4 +282,4 @@ ThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, message) {
   this.warnings.push(warningMessage.join(os.EOL));
 };
 
-module.exports = ThemeTemplatePlugin;
+module.exports = SassThemeTemplatePlugin;

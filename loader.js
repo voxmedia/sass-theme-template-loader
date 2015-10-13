@@ -1,7 +1,7 @@
 var path = require('path');
 var sass = require('node-sass');
 var async = require('async');
-var ThemeTemplatePlugin = require('./index');
+var SassThemeTemplatePlugin = require('./index');
 
 // This queue makes sure node-sass leaves one thread available for executing
 // fs tasks when running the custom importer code.
@@ -10,16 +10,15 @@ var threadPoolSize = process.env.UV_THREADPOOL_SIZE || 4;
 var asyncSassJobQueue = async.queue(sass.render, threadPoolSize - 1);
 
 /**
- * The sass-loader makes node-sass available to webpack modules.
- *
- * @param {string} content
- * @returns {string}
+ * The Sass theme template loader validates theme variable usage and renders Sass.
+ * @param {String} content of loaded file source.
+ * @returns {String} rendered CSS string with theme variable fields.
  */
-module.exports = function(content, plugin) {
-  var plugin = ThemeTemplatePlugin.plugin;
+module.exports = function(content) {
+  var plugin = SassThemeTemplatePlugin.plugin;
 
   if (!plugin) {
-    throw new Error("Theme template loaders must be used with ThemeTemplatePlugin.");
+    throw new Error("sass-theme-template-loader must be used with SassThemeTemplatePlugin.");
   }
 
   this.cacheable();
@@ -52,7 +51,9 @@ module.exports = function(content, plugin) {
   }
 
   function addDependency(filepath) {
-    self.dependency(path.normalize(filepath));
+    if (path.isAbsolute(filepath)) {
+      self.dependency(path.normalize(filepath));
+    }
   }
 
   function importerContext(filepath) {
@@ -79,10 +80,8 @@ module.exports = function(content, plugin) {
   if (isSync) {
     try {
       var result = sass.renderSync(opts);
-      result.stats.includedFiles.map(addDependency);
       return result.css.toString();
     } catch (err) {
-      err.file && addDependency(err.file);
       throw plugin.formatError(err, opts.file);
     }
   }
@@ -90,7 +89,6 @@ module.exports = function(content, plugin) {
   // Render Async:
   asyncSassJobQueue.push(opts, function(err, result) {
     if (err) {
-      err.file && addDependency(err.file);
       return callback(plugin.formatError(err, opts.file));
     }
 
@@ -102,7 +100,6 @@ module.exports = function(content, plugin) {
       result.map = null;
     }
 
-    result.stats.includedFiles.map(addDependency);
     callback(null, result.css.toString(), result.map);
   });
 };

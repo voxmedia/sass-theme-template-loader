@@ -28,6 +28,7 @@ function SassThemeTemplatePlugin(opts) {
   this.errors = [];
   this.warnings = [];
   this.options = opts;
+  this.dirty = true;
 }
 
 /**
@@ -46,12 +47,15 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       var cached = self.resourceCache[filename];
       if (cached && cached.timestamp < changed[filename]) {
         delete self.resourceCache[filename];
+        self.dirty = true;
       }
     }
   });
 
   // Pre-emit step used for a final pass on all published assets:
   compiler.plugin('emit', function(compilation, callback) {
+    if (!self.dirty) return callback();
+
     var pendingTasks = 1;
     var completedTasks = 0;
     var done = function() {
@@ -62,6 +66,7 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
         compilation.warnings.concat(self.warnings);
         self.errors = [];
         self.warnings = [];
+        self.dirty = false;
         callback();
       }
     };

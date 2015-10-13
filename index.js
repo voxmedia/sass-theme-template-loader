@@ -26,6 +26,7 @@ function SassThemeTemplatePlugin(opts) {
   this.renderer = new Thematic({}, opts);
   this.resourceCache = {};
   this.warnings = [];
+  this.options = opts;
 }
 
 /**
@@ -33,7 +34,7 @@ function SassThemeTemplatePlugin(opts) {
 */
 SassThemeTemplatePlugin.prototype.apply = function(compiler) {
   var self = this;
-  var cssFile = /(.+)\.css$/;
+  var cssFile = /([^\.]+).*\.css$/;
 
   // Pre-build step used to invalidate caches:
   compiler.plugin('compilation', function(compilation) {
@@ -55,6 +56,14 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       var source = asset.source();
       var templateSource = self.renderer.fieldLiteralsToInterpolations(source);
       var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
+
+      // Add header:
+      if (self.options.fileHeader)
+        templateSource = self.options.fileHeader + templateSource;
+
+      // Add footer:
+      if (self.options.fileFooter)
+        templateSource += self.options.fileFooter;
 
       // Add processed template asset to the build:
       compilation.assets[templateName] = {
@@ -218,7 +227,7 @@ SassThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
     resource.contents = this.renderer.varsToFieldLiterals(data);
     this.addWarning(err, filepath, 'Failed to parse syntax tree, using regex fallback');
   }
-  
+
   resource.timestamp = Date.now();
   this.resourceCache[filepath] = resource;
   return resource;

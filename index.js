@@ -1,6 +1,7 @@
 var fs = require('fs');
 var os = require('os');
 var path = require('path');
+var mkdirp = require('mkdirp');
 var Thematic = require('sass-thematic/lib/thematic');
 
 /**
@@ -16,7 +17,6 @@ function SassThemeTemplatePlugin(opts) {
   opts = opts || {};
 
   this.cwd = opts.cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
-  this.writePath = opts.writePath ? path.resolve(opts.cwd, opts.writePath) : null;
   this.filename = opts.filename || '[name].css';
   this.includeExts = opts.includeExts || ['.scss', '.sass'];
   this.includePaths = (opts.includePaths || []).map(function(includePath) {
@@ -25,6 +25,7 @@ function SassThemeTemplatePlugin(opts) {
 
   this.renderer = new Thematic({}, opts);
   this.resourceCache = {};
+  this.errors = [];
   this.warnings = [];
   this.options = opts;
 }
@@ -51,6 +52,25 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
 
   // Pre-emit step used for a final pass on all published assets:
   compiler.plugin('emit', function(compilation, callback) {
+    var pendingTasks = 1;
+    var completedTasks = 0;
+    var done = function() {
+      completedTasks++;
+      if (pendingTasks === completedTasks) {
+        // Report all warnings and reset plugin state:
+        compilation.errors.concat(self.errors);
+        compilation.warnings.concat(self.warnings);
+        self.errors = [];
+        self.warnings = [];
+        callback();
+      }
+    };
+
+    /**
+    * Renders a CSS asset within the Webpack compilation.
+    * The CSS will be populated with values,
+    * and an alternate template version will be created.
+    */
     function renderAsset(filename) {
       var asset = compilation.assets[filename];
       var source = asset.source();
@@ -75,18 +95,10 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
         }
       };
 
-      // Attempt to write the processed template asset:
-      // We're doing this in addition to adding the compiled asset,
-      // so that we can see the live rendered template view within an app.
-      if (self.writePath) {
-        var templatePath = path.resolve(self.writePath, templateName);
-
-        try {
-          fs.writeFileSync(templatePath, templateSource);
-        } catch(err) {
-          self.addWarning(err, templatePath, 'Template could not be written');
-        }
-      }
+      // Attempt to output the processed template asset:
+      // We're doing this in addition to adding the compiled asset to the build,
+      // so that we can access the live rendered template view within an app.
+      writeAsset(self.options.output, templateName, templateSource);
 
       // Process flat CSS asset:
       source = self.renderer.fieldLiteralsToValues(source);
@@ -100,6 +112,30 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       };
     }
 
+    /**
+    * Writes an asset to an output directory.
+    * This is done in addition to adding the asset to the webpack build,
+    * so that apps can access the template file as a view.
+    */
+    function writeAsset(outputPath, filename, source) {
+      if (!outputPath) return;
+
+      outputPath = (typeof outputPath === 'string') ? outputPath : compiler.options.output.path;
+      var templatePath = path.resolve(outputPath, filename);
+
+      pendingTasks++;
+      mkdirp(path.dirname(templatePath), function(err) {
+        if (err) {
+          self.addError(err, templatePath, 'template output directory could not be created');
+          return done();
+        }
+        fs.writeFile(templatePath, source, function(err) {
+          if (err) self.addError(err, templatePath, 'template could not be written');
+          return done();
+        });
+      });
+    }
+
     // Render all CSS assets:
     for (var filename in compilation.assets) {
       if (cssFile.test(filename)) {
@@ -107,14 +143,7 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       }
     }
 
-    // Report all warnings:
-    self.warnings.forEach(function(warning) {
-      compilation.warnings.push(warning);
-    });
-
-    // Reset plugin state:
-    self.warnings = [];
-    callback();
+    done();
   });
 };
 
@@ -274,7 +303,14 @@ SassThemeTemplatePlugin.prototype.formatError = function(err, fileContext, messa
 };
 
 /**
-* Formats a non-breaking warning message.
+* Adds a critical error message.
+*/
+SassThemeTemplatePlugin.prototype.addError = function(err, fileContext, message) {
+  this.errors.push(this.formatError(err, fileContext, message));
+};
+
+/**
+* Adds a non-critical warning message.
 */
 SassThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, message) {
   var warningMessage = ['Sass Theme Template'];

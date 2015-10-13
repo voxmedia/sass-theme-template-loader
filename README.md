@@ -6,7 +6,7 @@ This loader expects that you're already using the `extract-text-webpack-plugin` 
 
 ## Example
 
-**In `_theme.scss`:**  
+**In `_theme.scss`:**
 _This file identifies the names of relevant theme variables._
 
 ```scss
@@ -19,7 +19,7 @@ $color-theme: green;
 $color-other: red;
 ```
 
-**In `main.scss`:**  
+**In `main.scss`:**
 
 ```scss
 @import 'theme';
@@ -34,7 +34,7 @@ $color-other: red;
 }
 ```
 
-**Rendered `main.css`:**  
+**Rendered `main.css`:**
 
 ```css
 .themed { color: <%= @theme[:color_theme] %>; }
@@ -63,6 +63,9 @@ var config = {
     'main': 'main.js',
     'other': 'other.js'
   },
+  output: {
+    path: '/path/to/output'
+  },
   module: {
     loaders: [
       { test: /\.scss$/, loader: ExtractText.extract('style', 'css!sass-theme-template') },
@@ -75,7 +78,7 @@ var config = {
       includePaths: ['./shared/'],
       varsFile: './_vars.scss',
       filename: '[name].css.erb',
-      writePath: 'public/',
+      output: true,
       templateOpen: '<%= @theme[:',
       templateClose: '] %>',
       templateSnakeCase: true
@@ -86,9 +89,9 @@ var config = {
 
 **Setup:**
 
-The `SassThemeTemplate` plugin piggy-backs off of the `ExtractText` plugin. Like `extract-text-webpack-plugin`, this build tool also uses a loader and a plugin in tandem. 
+The `SassThemeTemplate` plugin piggy-backs off of the `ExtractText` plugin. Like `extract-text-webpack-plugin`, this build tool also uses a loader and a plugin in tandem.
 
-1. Install the `sass-theme-template` loader as the first (right-most) Sass loader. This should _replace_ all other Sass loaders. 
+1. Install the `sass-theme-template` loader as the first (right-most) Sass loader. This should _replace_ all other Sass loaders.
 1. Install the `SassThemeTemplate` after the `ExtractText` plugin. Configuration options are the same as [SassThematic](https://github.com/gmac/sass-thematic).
 
 **How it works:**

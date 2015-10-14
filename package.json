@@ -1,6 +1,6 @@
 {
   "name": "sass-theme-template-loader",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Sass to themed CSS-template loader for Webpack",
   "main": "index.js",
   "loader": "loader.js",

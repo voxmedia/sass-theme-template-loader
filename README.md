@@ -78,10 +78,12 @@ var config = {
       includePaths: ['./shared/'],
       varsFile: './_vars.scss',
       filename: '[name].css.erb',
-      output: true,
+      output: true, // << or a dirpath to write out templates
       templateOpen: '<%= @theme[:',
       templateClose: '] %>',
-      templateSnakeCase: true
+      templateSnakeCase: true,
+      fileHeader: '<%= @theme[:css_header] %>',
+      fileFooter: '<%= @theme[:css_footer] %>'
     })
   ]
 };

@@ -84,11 +84,12 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
 
       // Add header:
       if (self.options.fileHeader)
-        templateSource = self.options.fileHeader + templateSource;
+        templateSource = self.options.fileHeader +'\n'+ templateSource;
 
-      // Add footer:
+      // Add footer, replacing any sourcemap reference:
+      // (loader currently has zero source-map support)
       if (self.options.fileFooter)
-        templateSource += self.options.fileFooter;
+        templateSource = templateSource.replace(/(\/\*[^\*]+\*\/)?$/, self.options.fileFooter);
 
       // Add processed template asset to the build:
       compilation.assets[templateName] = {

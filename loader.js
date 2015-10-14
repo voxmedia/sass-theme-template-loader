@@ -33,23 +33,6 @@ module.exports = function(content) {
     outputStyle: this.minimize ? 'compressed' : plugin.renderer.outputStyle
   };
 
-  // opts.sourceMap
-  // Not using the `this.sourceMap` flag because css source maps are different
-  // @see https://github.com/webpack/css-loader/pull/40
-  if (opts.sourceMap) {
-    // deliberately overriding the sourceMap optsion
-    // this value is (currently) ignored by libsass when using the data input instead of file input
-    // however, it is still necessary for correct relative paths in result.map.sources
-    opts.sourceMap = this.options.output.path + '/sass.map';
-    opts.omitSourceMapUrl = true;
-
-    // If sourceMapContents option is not set, set it to true otherwise maps will be empty/null
-    // when exported by webpack-extract-text-plugin.
-    if (!opts.hasOwnProperty('sourceMapContents')) {
-      opts.sourceMapContents = true;
-    }
-  }
-
   function addDependency(filepath) {
     if (path.isAbsolute(filepath)) {
       self.dependency(path.normalize(filepath));
@@ -88,18 +71,7 @@ module.exports = function(content) {
 
   // Render Async:
   asyncSassJobQueue.push(opts, function(err, result) {
-    if (err) {
-      return callback(plugin.formatError(err, opts.file));
-    }
-
-    if (result.map && result.map !== '{}') {
-      result.map = JSON.parse(result.map);
-      result.map.file = opts.file;
-      result.map.sources[0] = path.relative(self.options.output.path, opts.file);
-    } else {
-      result.map = null;
-    }
-
-    callback(null, result.css.toString(), result.map);
+    if (err) return callback(plugin.formatError(err, opts.file));
+    callback(null, result.css.toString(), null);
   });
 };

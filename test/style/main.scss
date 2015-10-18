@@ -1,0 +1,16 @@
+@import 'a';
+@import 'b';
+@import 'theme';
+@import 'vars';
+
+.theme-var {
+  color: $theme-color;
+}
+
+.theme-field {
+  color: ____theme-color____;
+}
+
+.themeless {
+  color: $other-color;
+}

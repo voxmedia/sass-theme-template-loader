@@ -16,7 +16,7 @@ var asyncSassJobQueue = async.queue(sass.render, threadPoolSize - 1);
  */
 module.exports = function(content) {
   var plugin = SassThemeTemplatePlugin.plugin;
-
+  
   if (!plugin) {
     throw new Error("sass-theme-template-loader must be used with SassThemeTemplatePlugin.");
   }

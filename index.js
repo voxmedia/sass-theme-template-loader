@@ -61,9 +61,16 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
     var done = function() {
       completedTasks++;
       if (pendingTasks === completedTasks) {
-        // Report all warnings and reset plugin state:
-        compilation.errors.concat(self.errors);
-        compilation.warnings.concat(self.warnings);
+        // Report all errors and warnings:
+        // Important: Webpack requires the `push` method for reporting.
+        self.errors.forEach(function(err) {
+          compilation.errors.push(err);
+        });
+        self.warnings.forEach(function(warning) {
+          compilation.warnings.push(warning);
+        });
+
+        // Reset plugin state:
         self.errors = [];
         self.warnings = [];
         self.dirty = false;
@@ -253,14 +260,25 @@ SassThemeTemplatePlugin.prototype.resolveSync = function(uri, prevUri) {
 */
 SassThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
   var resource = {file: filepath};
+  var loadedSource = false;
 
   try {
-    resource.contents = this.renderer.loadSource(data)
-      .parse({template: true, disableTreeRemoval: true})
-      .toString();
+    // Attempt to load source as a parsed syntax tree...
+    // This could fail due to issues with the lexer;
+    // if this operation fails, it's a warning.
+    resource.contents = this.renderer.loadSource(data);
+    loadedSource = true;
   } catch (err) {
     resource.contents = this.renderer.varsToFieldLiterals(data);
     this.addWarning(err, filepath, 'Failed to parse syntax tree, using regex fallback');
+  }
+
+  if (loadedSource) try {
+    // If source was successfully loaded, then we'll attempt to parse it.
+    // If this operation fails, the results are errors.
+    resource.contents = this.renderer.parse({template: true, disableTreeRemoval: true}).toString();
+  } catch (err) {
+    this.addError(err, filepath, 'Error parsing theme variables');
   }
 
   resource.timestamp = Date.now();

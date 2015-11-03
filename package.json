@@ -1,6 +1,6 @@
 {
   "name": "sass-theme-template-loader",
-  "version": "0.0.9",
+  "version": "2.0.0",
   "description": "Sass to themed CSS template loader for Webpack",
   "main": "index.js",
   "loader": "loader.js",
@@ -20,9 +20,9 @@
   "dependencies": {
     "async": "^1.4.2",
     "mkdirp": "^0.5.1",
-    "sass-thematic": "^1.3.0"
+    "sass-thematic": "^2.0.0"
   },
   "peerDependencies": {
-    "node-sass": "^3.3.0"
+    "node-sass": "3.3.3"
   }
 }

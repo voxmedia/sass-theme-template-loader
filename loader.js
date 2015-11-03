@@ -1,6 +1,6 @@
 var path = require('path');
-var sass = require('node-sass');
 var async = require('async');
+var sass = require('node-sass');
 var SassThemeTemplatePlugin = require('./index');
 
 // This queue makes sure node-sass leaves one thread available for executing
@@ -27,11 +27,10 @@ module.exports = function(content) {
   var callback = this.async();
   var isSync = typeof callback !== 'function';
   var resource = plugin.parseResource(this.resourcePath, content);
-  var opts = {
+  var opts = plugin.renderer.merge({}, plugin.renderer.sassOptions || {}, {
     file: resource.file,
-    data: resource.contents,
-    outputStyle: this.minimize ? 'compressed' : plugin.renderer.outputStyle
-  };
+    data: resource.contents
+  });
 
   function addDependency(filepath) {
     if (path.isAbsolute(filepath)) {
@@ -58,6 +57,9 @@ module.exports = function(content) {
   }
 
   opts.importer = isSync ? importerSync : importerAsync;
+
+  // Webpack setting for optimized output:
+  if (this.minimize) opts.outputStyle = 'compressed';
 
   // Render Sync:
   if (isSync) {

@@ -2,7 +2,7 @@ var fs = require('fs');
 var os = require('os');
 var path = require('path');
 var mkdirp = require('mkdirp');
-var Thematic = require('sass-thematic/lib/thematic');
+var Thematic = require('sass-thematic');
 
 /**
 * Theme Template Plugin for Webpack
@@ -86,7 +86,7 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
     function renderAsset(filename) {
       var asset = compilation.assets[filename];
       var source = asset.source();
-      var templateSource = self.renderer.fieldLiteralsToInterpolations(source);
+      var templateSource = self.renderer.fieldIdentifiersToInterpolations(source);
       var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
 
       // Add header:
@@ -114,7 +114,7 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       writeAsset(self.options.output, templateName, templateSource);
 
       // Process flat CSS asset:
-      source = self.renderer.fieldLiteralsToValues(source);
+      source = self.renderer.fieldIdentifiersToValues(source);
 
       // Update CSS asset within the build:
       asset.source = function() {
@@ -269,14 +269,18 @@ SassThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
     resource.contents = this.renderer.loadSource(data);
     loadedSource = true;
   } catch (err) {
-    resource.contents = this.renderer.varsToFieldLiterals(data);
+    resource.contents = this.renderer.varsToFieldIdentifiers(data);
     this.addWarning(err, filepath, 'Failed to parse syntax tree, using regex fallback');
   }
 
   if (loadedSource) try {
     // If source was successfully loaded, then we'll attempt to parse it.
     // If this operation fails, the results are errors.
-    resource.contents = this.renderer.parse({template: true, disableTreeRemoval: true}).toString();
+    resource.contents = this.renderer.parse({
+      treeRemoval: false,
+      varsRemoval: true,
+      template: true
+    }).toString();
   } catch (err) {
     this.addError(err, filepath, 'Error parsing theme variables');
   }

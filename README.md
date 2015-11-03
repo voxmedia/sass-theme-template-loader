@@ -4,6 +4,10 @@ When creating themed websites, a common strategy is to generate pre-rendered CSS
 
 This loader expects that you're already using the `extract-text-webpack-plugin` to pull your CSS assets out into separate files. This loader will render Sass markup with embedded template fields, and then generate a template version of all extracted CSS assets.
 
+## WARNING: `node-sass@3.4.x`
+
+The `node-sass` importer suffered serious regressions in the v3.4.0 release. This loader is broken in `node-sass@3.4.x` until the regression fixes ship (supposedly) in v3.4.2. For now, you must use `node-sass@3.3.3` with this tool.
+
 ## Example
 
 **In `_theme.scss`:**

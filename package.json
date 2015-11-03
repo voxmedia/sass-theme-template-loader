@@ -20,7 +20,7 @@
   "dependencies": {
     "async": "^1.4.2",
     "mkdirp": "^0.5.1",
-    "sass-thematic": "^2.0.0"
+    "sass-thematic": "^2.0.2"
   },
   "peerDependencies": {
     "node-sass": "3.3.3"

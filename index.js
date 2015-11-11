@@ -54,8 +54,6 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
 
   // Pre-emit step used for a final pass on all published assets:
   compiler.plugin('emit', function(compilation, callback) {
-    if (!self.dirty) return callback();
-
     var pendingTasks = 1;
     var completedTasks = 0;
     var done = function() {
@@ -111,7 +109,7 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       // Attempt to output the processed template asset:
       // We're doing this in addition to adding the compiled asset to the build,
       // so that we can access the live rendered template view within an app.
-      writeAsset(self.options.output, templateName, templateSource);
+      if (self.dirty) writeAsset(self.options.output, templateName, templateSource);
 
       // Process flat CSS asset:
       source = self.renderer.fieldIdentifiersToValues(source);

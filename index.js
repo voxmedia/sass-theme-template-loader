@@ -25,6 +25,8 @@ function SassThemeTemplatePlugin(opts) {
 
   this.renderer = new Thematic({}, opts);
   this.resourceCache = {};
+  this.usageByFile = {};
+  this.usageByField = {};
   this.errors = [];
   this.warnings = [];
   this.options = opts;
@@ -98,12 +100,8 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
 
       // Add processed template asset to the build:
       compilation.assets[templateName] = {
-        source: function() {
-          return templateSource;
-        },
-        size: function() {
-          return templateSource.length;
-        }
+        source: function() { return templateSource; },
+        size:   function() { return templateSource.length; }
       };
 
       // Attempt to output the processed template asset:
@@ -115,12 +113,8 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
       source = self.renderer.fieldIdentifiersToValues(source);
 
       // Update CSS asset within the build:
-      asset.source = function() {
-        return source;
-      };
-      asset.size = function() {
-        return source.length;
-      };
+      asset.source = function() { return source; };
+      asset.size =   function() { return source.length; };
     }
 
     /**
@@ -153,6 +147,13 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
         renderAsset(filename);
       }
     }
+
+    // Generate field usage report:
+    var usageReport = JSON.stringify({ fields: self.usageByField, files: self.usageByFile });
+    compilation.assets['theme-usage.json'] = {
+      source: function() { return usageReport; },
+      size:   function() { return usageReport.length; }
+    };
 
     done();
   });
@@ -267,7 +268,10 @@ SassThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
     resource.contents = this.renderer.loadSource(data);
     loadedSource = true;
   } catch (err) {
-    resource.contents = this.renderer.varsToFieldIdentifiers(data);
+    resource.contents = this.renderer
+      .resetMapping()
+      .scanFieldUsage(data)
+      .varsToFieldIdentifiers(data);
     this.addWarning(err, filepath, 'Failed to parse syntax tree, using regex fallback');
   }
 
@@ -284,6 +288,7 @@ SassThemeTemplatePlugin.prototype.parseResource = function(filepath, data) {
   }
 
   resource.timestamp = Date.now();
+  resource.usage = this.renderer.usage;
   this.resourceCache[filepath] = resource;
   return resource;
 };
@@ -351,6 +356,44 @@ SassThemeTemplatePlugin.prototype.addWarning = function(err, fileContext, messag
   if (preview) warningMessage.push(preview);
 
   this.warnings.push(warningMessage.join(os.EOL));
+};
+
+/**
+* Reports field usage for a file and its aggregated dependencies.
+* Usage is reported by...
+* - field: specifying what files implement the field.
+* - file: specifying what fields the file implements.
+* @param {String} filename of the parent file to report on.
+* @param {Array} dependencies array to aggregate into the file report.
+*/
+SassThemeTemplatePlugin.prototype.reportFieldUsage = function(filename, deps) {
+  deps.push(filename);
+
+  var resources = this.resourceCache;
+  var usage = deps.reduce(function(memo, filepath) {
+    var resource = resources[filepath];
+    if (resource && resource.usage) {
+      for (var field in resource.usage) {
+        if (resource.usage.hasOwnProperty(field)) {
+          // Add all field usage counts into the by-file mapping table:
+          // this aggregates the counts of all dependencies together into one summary.
+          if (!memo[field]) memo[field] = 0;
+          memo[field] += resource.usage[field];
+        }
+      }
+    }
+    return memo;
+  }, {});
+
+  this.usageByFile[filename] = usage;
+
+  for (var field in usage) {
+    if (usage.hasOwnProperty(field)) {
+      // Add all field usage counts for this file into the by-field mapping table:
+      if (!this.usageByField[field]) this.usageByField[field] = {};
+      this.usageByField[field][filename] = usage[field];
+    }
+  }
 };
 
 module.exports = SassThemeTemplatePlugin;

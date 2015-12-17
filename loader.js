@@ -24,6 +24,7 @@ module.exports = function(content) {
   this.cacheable();
 
   var self = this;
+  var deps = [];
   var callback = this.async();
   var isSync = typeof callback !== 'function';
   var resource = plugin.parseResource(this.resourcePath, content);
@@ -34,7 +35,9 @@ module.exports = function(content) {
 
   function addDependency(filepath) {
     if (path.isAbsolute(filepath)) {
-      self.dependency(path.normalize(filepath));
+      filepath = path.normalize(filepath);
+      self.dependency(filepath);
+      deps.push(filepath);
     }
   }
 
@@ -65,6 +68,7 @@ module.exports = function(content) {
   if (isSync) {
     try {
       var result = sass.renderSync(opts);
+      plugin.reportFieldUsage(this.resourcePath, deps);
       return result.css.toString();
     } catch (err) {
       throw plugin.formatError(err, opts.file);
@@ -74,6 +78,7 @@ module.exports = function(content) {
   // Render Async:
   asyncSassJobQueue.push(opts, function(err, result) {
     if (err) return callback(plugin.formatError(err, opts.file));
+    plugin.reportFieldUsage(self.resourcePath, deps);
     callback(null, result.css.toString(), null);
   });
 };

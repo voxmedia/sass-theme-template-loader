@@ -18,6 +18,7 @@ function SassThemeTemplatePlugin(opts) {
 
   this.cwd = opts.cwd = opts.cwd ? path.resolve(opts.cwd) : process.cwd();
   this.filename = opts.filename || '[name].css';
+  this.templateFormat = opts.templateFormat || {};
   this.includeExts = opts.includeExts || ['.scss', '.sass'];
   this.includePaths = (opts.includePaths || []).map(function(includePath) {
     return path.resolve(this.cwd, includePath);
@@ -84,19 +85,23 @@ SassThemeTemplatePlugin.prototype.apply = function(compiler) {
     * and an alternate template version will be created.
     */
     function renderAsset(filename) {
+      var name = filename.match(cssFile)[1];
       var asset = compilation.assets[filename];
       var source = asset.source();
       var templateSource = self.renderer.fieldIdentifiersToInterpolations(source);
-      var templateName = self.filename.replace('[name]', filename.match(cssFile)[1]);
+      var templateName = self.filename.replace('[name]', name);
+      var format = self.templateFormat[name] || self.templateFormat;
 
       // Add header:
-      if (self.options.fileHeader)
-        templateSource = self.options.fileHeader +'\n'+ templateSource;
+      if (format.header) {
+        templateSource = format.header +'\n'+ templateSource;
+      }
 
       // Add footer, replacing any sourcemap reference:
       // (loader currently has no sourcemap support)
-      if (self.options.fileFooter)
-        templateSource = templateSource.replace(/\n*(\/\*[^\*]+\*\/)?$/, '\n'+ self.options.fileFooter);
+      if (format.footer) {
+        templateSource = templateSource.replace(/\n*(\/\*[^\*]+\*\/)?$/, '\n'+ format.footer);
+      }
 
       // Add processed template asset to the build:
       compilation.assets[templateName] = {
@@ -372,6 +377,7 @@ SassThemeTemplatePlugin.prototype.reportFieldUsage = function(filename, deps) {
   var resources = this.resourceCache;
   var usage = deps.reduce(function(memo, filepath) {
     var resource = resources[filepath];
+
     if (resource && resource.usage) {
       for (var field in resource.usage) {
         if (resource.usage.hasOwnProperty(field)) {
@@ -385,6 +391,7 @@ SassThemeTemplatePlugin.prototype.reportFieldUsage = function(filename, deps) {
     return memo;
   }, {});
 
+  filename = path.relative(this.cwd, filename);
   this.usageByFile[filename] = usage;
 
   for (var field in usage) {
